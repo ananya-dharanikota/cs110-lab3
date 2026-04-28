@@ -5,33 +5,217 @@
     <title>Tic Tac Toe Game</title>
     
     <link rel="stylesheet" href="style.css" />
-    <script src="main.js"></script>
   </head>
   <body>
 
     <h1>Tic Tac Toe</h1>
-    <h2>Its your turn, <span class="display_player"></span>.</h2>
-
-    <div class="game_board">
-      <div class='row'>
-        <div class="one"><span class="xo"></span></div>
-        <div class="two"><span class="xo"></span></div>
-        <div class="three"><span class="xo"></span></div>
-      </div>
-      <div class='row'>
-        <div class="four"><span class="xo"></span></div>
-        <div class="five"><span class="xo"></span></div>
-        <div class="six"><span class="xo"></span></div>
-      </div>
-      <div class='row'>
-        <div class="seven"><span class="xo"></span></div>
-        <div class="eight"><span class="xo"></span></div>
-        <div class="nine"><span class="xo"></span></div>
-      </div>
+  <h2>Its your turn, <span class="display_player">X</span>.</h2>
+ 
+  <div class="game_board">
+    <div class='row'>
+      <div class="one"><span class="xo"></span></div>
+      <div class="two"><span class="xo"></span></div>
+      <div class="three"><span class="xo"></span></div>
     </div>
-
-    <button class="new_game">New Game</button>
-    <button class="reset">Reset</button>
+    <div class='row'>
+      <div class="four"><span class="xo"></span></div>
+      <div class="five"><span class="xo"></span></div>
+      <div class="six"><span class="xo"></span></div>
+    </div>
+    <div class='row'>
+      <div class="seven"><span class="xo"></span></div>
+      <div class="eight"><span class="xo"></span></div>
+      <div class="nine"><span class="xo"></span></div>
+    </div>
+  </div>
+ 
+  <button class="new_game">New Game</button>
+  <button class="reset">Reset</button>
+ 
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let xMoves   = [];
+let oMoves   = [];
+let currentPlayer = 'X';
+let gameOver  = false;
+let scores    = { X: 0, O: 0 };
+let vsAI      = false;
+ 
+const WIN_COMBOS = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6]
+];
+ 
+// ── DOM ───────────────────────────────────────────────────────────────────────
+const cells       = document.querySelectorAll('.game_board .xo');
+const turnDisplay = document.querySelector('.display_player');
+const newGameBtn  = document.querySelector('.new_game');
+const resetBtn    = document.querySelector('.reset');
+ 
+// ── Extra UI ──────────────────────────────────────────────────────────────────
+function buildExtraUI() {
+  const scoreDiv = document.createElement('div');
+  scoreDiv.className = 'whose_turn';
+  scoreDiv.id = 'score_display';
+  scoreDiv.textContent = 'Scores: X : 0  O: 0';
+  document.querySelector('h2').insertAdjacentElement('afterend', scoreDiv);
+ 
+  const aiBtn = document.createElement('button');
+  aiBtn.className = 'new_game';
+  aiBtn.id = 'ai_toggle';
+  aiBtn.textContent = '🤖 Play vs AI';
+  resetBtn.insertAdjacentElement('afterend', aiBtn);
+ 
+  aiBtn.addEventListener('click', () => {
+    vsAI = !vsAI;
+    aiBtn.textContent = vsAI ? '👥 Play vs Human' : '🤖 Play vs AI';
+    aiBtn.style.backgroundColor = vsAI ? '#228b22' : '#6a5acd';
+    startNewGame();
+  });
+}
+ 
+function updateScoreDisplay() {
+  document.getElementById('score_display').textContent =
+    `Scores: X : ${scores.X}  O: ${scores.O}`;
+}
+ 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function hasWon(moves) {
+  return WIN_COMBOS.some(combo => combo.every(i => moves.includes(i)));
+}
+function winningCombo(moves) {
+  return WIN_COMBOS.find(combo => combo.every(i => moves.includes(i)));
+}
+function cellIndex(spanEl) { return [...cells].indexOf(spanEl); }
+function allTaken() { return xMoves.length + oMoves.length === 9; }
+ 
+// ── Rendering ─────────────────────────────────────────────────────────────────
+function renderBoard() {
+  cells.forEach((span, i) => {
+    span.parentElement.style.backgroundColor = 'pink';
+    if      (xMoves.includes(i)) span.textContent = 'X';
+    else if (oMoves.includes(i)) span.textContent = 'O';
+    else                         span.textContent = '';
+  });
+}
+ 
+function highlightWinner(combo) {
+  combo.forEach(i => { cells[i].parentElement.style.backgroundColor = '#ff6b6b'; });
+}
+ 
+function setTurnText(msg) { if (turnDisplay) turnDisplay.textContent = msg; }
+ 
+// ── Move handling ─────────────────────────────────────────────────────────────
+function handleMove(index) {
+  if (gameOver) return;
+  if (xMoves.includes(index) || oMoves.includes(index)) return;
+ 
+  if (currentPlayer === 'X') xMoves.push(index);
+  else                        oMoves.push(index);
+ 
+  renderBoard();
+  checkEndConditions();
+}
+ 
+function checkEndConditions() {
+  const moves = currentPlayer === 'X' ? xMoves : oMoves;
+  if (hasWon(moves)) {
+    highlightWinner(winningCombo(moves));
+    scores[currentPlayer]++;
+    updateScoreDisplay();
+    setTurnText(`${currentPlayer} wins! 🎉`);
+    gameOver = true;
+    return;
+  }
+  if (allTaken()) {
+    setTurnText("It's a tie! 🤝");
+    gameOver = true;
+    return;
+  }
+ 
+  currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+  setTurnText(currentPlayer);
+ 
+  if (vsAI && currentPlayer === 'O' && !gameOver) {
+    setTimeout(aiMove, 300);
+  }
+}
+ 
+// ── Minimax AI ────────────────────────────────────────────────────────────────
+function minimax(xArr, oArr, isMaximizing) {
+  if (hasWon(xArr)) return -10;
+  if (hasWon(oArr)) return  10;
+  if (xArr.length + oArr.length === 9) return 0;
+ 
+  const available = [...Array(9).keys()].filter(i => !xArr.includes(i) && !oArr.includes(i));
+ 
+  if (isMaximizing) {
+    let best = -Infinity;
+    for (const move of available) {
+      oArr.push(move);
+      best = Math.max(best, minimax(xArr, oArr, false));
+      oArr.pop();
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const move of available) {
+      xArr.push(move);
+      best = Math.min(best, minimax(xArr, oArr, true));
+      xArr.pop();
+    }
+    return best;
+  }
+}
+ 
+function bestAIMove() {
+  const available = [...Array(9).keys()].filter(i => !xMoves.includes(i) && !oMoves.includes(i));
+  let bestVal = -Infinity, bestMove = available[0];
+  for (const move of available) {
+    oMoves.push(move);
+    const val = minimax([...xMoves], oMoves, false);
+    oMoves.pop();
+    if (val > bestVal) { bestVal = val; bestMove = move; }
+  }
+  return bestMove;
+}
+ 
+function aiMove() {
+  if (gameOver) return;
+  handleMove(bestAIMove());
+}
+ 
+// ── New Game / Reset ──────────────────────────────────────────────────────────
+function startNewGame() {
+  xMoves = []; oMoves = [];
+  currentPlayer = 'X';
+  gameOver = false;
+  renderBoard();
+  setTurnText('X');
+}
+ 
+function fullReset() {
+  scores = { X: 0, O: 0 };
+  updateScoreDisplay();
+  startNewGame();
+}
+ 
+// ── Event listeners ───────────────────────────────────────────────────────────
+cells.forEach(span => {
+  span.parentElement.addEventListener('click', () => {
+    if (vsAI && currentPlayer === 'O') return;
+    handleMove(cellIndex(span));
+  });
+});
+ 
+newGameBtn.addEventListener('click', startNewGame);
+resetBtn.addEventListener('click', fullReset);
+ 
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildExtraUI();
+setTurnText('X');
+</script>
   </body>
 
 
